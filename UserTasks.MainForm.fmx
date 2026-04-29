@@ -1,0 +1,148 @@
+object FormMain: TFormMain
+  Left = 0
+  Top = 0
+  Caption = 'UserTasks'
+  ClientHeight = 680
+  ClientWidth = 390
+  FormFactor.Width = 320
+  FormFactor.Height = 568
+  FormFactor.Devices = [dkPhone]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  PixelsPerInch = 96
+  TextHeight = 15
+  object LayoutRoot: TLayout
+    Align = alClient
+    Size.Width = 390.000000000000000
+    Size.Height = 680.000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object RectHeader: TRectangle
+      Align = alTop
+      Fill.Color = claIndigo
+      Height = 140.000000000000000
+      Stroke.Kind = bkNone
+      Width = 390.000000000000000
+      object LabelTitle: TLabel
+        Align = alNone
+        Font.Size = 26.000000000000000
+        Font.Style = [TFontStyle.fsBold]
+        FontColor = claWhite
+        Position.X = 20.000000000000000
+        Position.Y = 40.000000000000000
+        Text = 'UserTasks'
+        Width = 200.000000000000000
+        Height = 36.000000000000000
+      end
+      object LabelSubtitle: TLabel
+        Align = alNone
+        Font.Size = 13.000000000000000
+        FontColor = $CCFFFFFF
+        Position.X = 20.000000000000000
+        Position.Y = 82.000000000000000
+        Text = 'Work reminder, every 15 minutes'
+        Width = 280.000000000000000
+        Height = 22.000000000000000
+      end
+    end
+    object RectCard: TRectangle
+      Align = alNone
+      Fill.Color = $FF263238
+      Height = 220.000000000000000
+      Position.X = 20.000000000000000
+      Position.Y = 160.000000000000000
+      CornerType = ctRound
+      XRadius = 14.000000000000000
+      YRadius = 14.000000000000000
+      Stroke.Kind = bkNone
+      Width = 350.000000000000000
+      object ShadowEffect1: TShadowEffect
+        Enabled = True
+        Direction = 90.000000000000000
+        Distance = 6.000000000000000
+        Opacity = 0.350000000000000
+        SoftMargin = 10.000000000000000
+        Color = claBlack
+      end
+      object LabelCardTitle: TLabel
+        Align = alNone
+        Font.Size = 16.000000000000000
+        Font.Style = [TFontStyle.fsBold]
+        FontColor = claWhite
+        Position.X = 20.000000000000000
+        Position.Y = 20.000000000000000
+        Text = '⏰  Periodic Reminder'
+        Width = 260.000000000000000
+        Height = 26.000000000000000
+      end
+      object LabelCardDesc: TLabel
+        Align = alNone
+        Font.Size = 12.000000000000000
+        FontColor = $FFAAAAAA
+        Position.X = 20.000000000000000
+        Position.Y = 56.000000000000000
+        Width = 310.000000000000000
+        Height = 60.000000000000000
+        WordWrap = True
+        Text =
+          'Schedules an Android WorkManager task that sends you a ' +
+          '"Start Working!" notification every 15 minutes, even when ' +
+          'the app is closed.'
+      end
+      object BtnSchedule: TButton
+        Align = alNone
+        Font.Size = 14.000000000000000
+        Font.Style = [TFontStyle.fsBold]
+        Height = 46.000000000000000
+        Position.X = 20.000000000000000
+        Position.Y = 130.000000000000000
+        Text = '▶  Start Reminder'
+        Width = 148.000000000000000
+        StyleLookup = 'buttonstyle'
+        OnClick = BtnScheduleClick
+      end
+      object BtnCancel: TButton
+        Align = alNone
+        Font.Size = 14.000000000000000
+        Font.Style = [TFontStyle.fsBold]
+        Height = 46.000000000000000
+        Position.X = 182.000000000000000
+        Position.Y = 130.000000000000000
+        Text = '⏹  Stop'
+        Width = 148.000000000000000
+        OnClick = BtnCancelClick
+      end
+    end
+    object RectStatus: TRectangle
+      Align = alNone
+      Fill.Color = $FF37474F
+      Height = 60.000000000000000
+      Position.X = 20.000000000000000
+      Position.Y = 400.000000000000000
+      CornerType = ctRound
+      XRadius = 10.000000000000000
+      YRadius = 10.000000000000000
+      Stroke.Kind = bkNone
+      Width = 350.000000000000000
+      object LabelStatusIcon: TLabel
+        Align = alNone
+        Font.Size = 22.000000000000000
+        Position.X = 14.000000000000000
+        Position.Y = 14.000000000000000
+        Text = '⚪'
+        Width = 36.000000000000000
+        Height = 32.000000000000000
+      end
+      object LabelStatus: TLabel
+        Align = alNone
+        Font.Size = 13.000000000000000
+        FontColor = $FFEAEAEA
+        Position.X = 56.000000000000000
+        Position.Y = 20.000000000000000
+        Text = 'No reminder scheduled'
+        Width = 280.000000000000000
+        Height = 22.000000000000000
+      end
+    end
+  end
+end

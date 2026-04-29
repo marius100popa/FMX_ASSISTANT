@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidManifest additions for UserTasks
+  ========================================
+  Merge these entries into your project's AndroidManifest.template.xml
+  in Delphi IDE (Project > Options > Version Info > Manifest).
+
+  Full path in Delphi project: <ProjectDir>/AndroidManifest.template.xml
+-->
+
+<!-- ① Permissions needed inside <manifest> -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<!--  Required on Android 13+ (API 33) to show notifications  -->
+
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+<!--  Lets WorkManager re-schedule tasks after device reboot  -->
+
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<!--  Optional: only needed if you later add expedited work  -->
+
+
+<!-- ② WorkManager provider + Worker class inside <application> -->
+
+<!--
+  WorkManager initialisation provider — required, add once.
+  Replace "com.embarcadero.usertasks" with your actual package name.
+-->
+<provider
+    android:name="androidx.work.impl.WorkManagerInitializer"
+    android:authorities="${applicationId}.workmanager-init"
+    android:exported="false"
+    android:multiprocess="true" />
+
+<!--
+  Our custom Worker class — no extra registration needed for WorkManager,
+  but keeping it here helps some Delphi build tools pick it up.
+  (WorkManager discovers Workers reflectively at runtime.)
+-->
+
+<!-- ③ Example full <application> block snippet -->
+<!--
+<application
+    android:label="UserTasks"
+    android:icon="@drawable/ic_launcher"
+    android:theme="@style/AppTheme">
+
+    ... your existing activity / service tags ...
+
+    <provider
+        android:name="androidx.work.impl.WorkManagerInitializer"
+        android:authorities="${applicationId}.workmanager-init"
+        android:exported="false"
+        android:multiprocess="true" />
+
+</application>
+-->
