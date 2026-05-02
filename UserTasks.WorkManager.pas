@@ -43,6 +43,7 @@ implementation
 
 {$IFDEF ANDROID}
 uses
+  Androidapi.Jni,
   Androidapi.JNI.JavaTypes,
   Androidapi.JNI.GraphicsContentViewText,
   Androidapi.Helpers,
@@ -254,8 +255,7 @@ begin
 {$IFDEF ANDROID}
   CallJavaWorkManager(ATaskName, Interval, ANotifTitle, ANotifBody);
 {$ELSE}
-  raise EPlatformNotSupported.Create(
-    'WorkManager is only available on Android.');
+  raise EPlatformNotSupported.Create('WorkManager is only available on Android.');
 {$ENDIF}
 end;
 
@@ -264,8 +264,7 @@ begin
 {$IFDEF ANDROID}
   CallJavaCancelWork(ATaskName);
 {$ELSE}
-  raise EPlatformNotSupported.Create(
-    'WorkManager is only available on Android.');
+  raise EPlatformNotSupported.Create('WorkManager is only available on Android.');
 {$ENDIF}
 end;
 
