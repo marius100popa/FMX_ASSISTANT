@@ -1,0 +1,413 @@
+unit uTeliteDateFormatSelector;
+
+{
+  TTeliteDateFormatSelector
+  --------------------------
+  Componenta VCL extinsa din TPanel care permite selectia unui format de data.
+
+  Contine:
+    - Un TLabel + TComboBox pentru selectia separatorului (-, /, ., spatiu, fara)
+    - Un TLabel + TComboBox pentru selectia ordinii componentelor datei
+      (alimentat automat la schimbarea separatorului)
+
+  Properties expuse in Object Inspector:
+    - Align, Color, Font, Enabled, Visible    (mostenite, re-publicate)
+    - DateFormat      : TTELITE_DATE_FORMAT   (r/w - formatul selectat)
+    - Separator       : TTELITE_SEPARATOR     (r/w - separatorul selectat)
+    - LabelSeparator  : string               (textul label-ului Separator)
+    - LabelFormat     : string               (textul label-ului Format)
+    - OnFormatChanged : TNotifyEvent         (eveniment la schimbare format)
+
+  Utilizare:
+    DateFormatSelector1.Separator  := tsDash;
+    DateFormatSelector1.DateFormat := edfYYYY_MM_DD;
+    ShowMessage(DateFormatSelector1.FormattedMask); // '2025-12-31'
+}
+
+interface
+
+uses
+  System.SysUtils,
+  System.Classes,
+  Vcl.Controls,
+  Vcl.ExtCtrls,
+  Vcl.StdCtrls,
+  Vcl.Graphics,
+  uTeliteDateFormat;
+
+type
+  /// <summary>
+  /// Enumerare pentru separatorul dintre componentele datei.
+  /// </summary>
+  TTELITE_SEPARATOR = (
+    tsNone   = 0,  // Fara separator    (ex: 20251231)
+    tsDash   = 1,  // Linie             (ex: 2025-12-31)
+    tsSlash  = 2,  // Slash             (ex: 2025/12/31)
+    tsDot    = 3,  // Punct             (ex: 2025.12.31)
+    tsSpace  = 4   // Spatiu            (ex: 2025 12 31)
+  );
+
+  TTeliteDateFormatSelector = class(TPanel)
+  private
+    FLblSeparator  : TLabel;
+    FCmbSeparator  : TComboBox;
+    FLblFormat     : TLabel;
+    FCmbFormat     : TComboBox;
+
+    FOnFormatChanged : TNotifyEvent;
+
+    function  GetSeparatorChar: string;
+    function  GetSeparator: TTELITE_SEPARATOR;
+    procedure SetSeparator(const AValue: TTELITE_SEPARATOR);
+    function  GetDateFormat: TTELITE_DATE_FORMAT;
+    procedure SetDateFormat(const AValue: TTELITE_DATE_FORMAT);
+    function  GetLabelSeparatorText: string;
+    procedure SetLabelSeparatorText(const AValue: string);
+    function  GetLabelFormatText: string;
+    procedure SetLabelFormatText(const AValue: string);
+
+    procedure PopulateSeparatorCombo;
+    procedure PopulateFormatCombo;
+    procedure RebuildLayout;
+
+    procedure OnSeparatorChange(Sender: TObject);
+    procedure OnFormatChange(Sender: TObject);
+
+  protected
+    procedure Loaded; override;
+    procedure Resize; override;
+
+  public
+    constructor Create(AOwner: TComponent); override;
+
+    /// <summary>
+    /// Returneaza masca completa de formatare, cu separatorul aplicat.
+    /// Ex: 'YYYY-MM-DD', 'DD/MM/YYYY', 'YYYYMMDD'
+    /// </summary>
+    function FormattedMask: string;
+
+    /// <summary>
+    /// Returneaza caracterul separator curent ca string.
+    /// </summary>
+    property SeparatorChar: string read GetSeparatorChar;
+
+  published
+    // --- Properties proprii ---
+    property Separator      : TTELITE_SEPARATOR    read GetSeparator    write SetSeparator    default tsDash;
+    property DateFormat     : TTELITE_DATE_FORMAT  read GetDateFormat   write SetDateFormat   default edfYYYY_MM_DD;
+    property LabelSeparator : string               read GetLabelSeparatorText write SetLabelSeparatorText;
+    property LabelFormat    : string               read GetLabelFormatText    write SetLabelFormatText;
+    property OnFormatChanged: TNotifyEvent         read FOnFormatChanged      write FOnFormatChanged;
+
+    // --- Properties mostenite re-publicate ---
+    property Align;
+    property Anchors;
+    property Color;
+    property Enabled;
+    property Font;
+    property Height;
+    property Hint;
+    property ParentColor;
+    property ParentFont;
+    property ShowHint;
+    property TabOrder;
+    property TabStop;
+    property Visible;
+    property Width;
+    property OnClick;
+    property OnEnter;
+    property OnExit;
+    property OnMouseEnter;
+    property OnMouseLeave;
+  end;
+
+procedure Register;
+
+implementation
+
+// ---------------------------------------------------------------------------
+// Constante interne
+// ---------------------------------------------------------------------------
+
+const
+  SEPARATOR_CHARS: array[TTELITE_SEPARATOR] of string = (
+    '',   // tsNone
+    '-',  // tsDash
+    '/',  // tsSlash
+    '.',  // tsDot
+    ' '   // tsSpace
+  );
+
+  SEPARATOR_LABELS: array[TTELITE_SEPARATOR] of string = (
+    'Fara separator',
+    'Linie  ( - )',
+    'Slash  ( / )',
+    'Punct  ( . )',
+    'Spatiu (   )'
+  );
+
+  CTRL_MARGIN   = 6;   // Marginea exterioara a controalelor in panel
+  CTRL_SPACING  = 4;   // Spatiul vertical intre rand de label+combo
+  LABEL_HEIGHT  = 16;
+  COMBO_HEIGHT  = 22;
+  ROW_HEIGHT    = LABEL_HEIGHT + CTRL_SPACING + COMBO_HEIGHT;  // 42
+
+// ---------------------------------------------------------------------------
+// TTeliteDateFormatSelector
+// ---------------------------------------------------------------------------
+
+constructor TTeliteDateFormatSelector.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+
+  // Aspect panel implicit
+  Width        := 260;
+  Height       := 2 * CTRL_MARGIN + 2 * ROW_HEIGHT + CTRL_SPACING * 3;
+  Caption      := '';
+  BevelOuter   := bvNone;
+  ParentColor  := False;
+  Color        := clBtnFace;
+
+  // --- Label Separator ---
+  FLblSeparator         := TLabel.Create(Self);
+  FLblSeparator.Parent  := Self;
+  FLblSeparator.Caption := 'Separator';
+  FLblSeparator.AutoSize:= False;
+
+  // --- Combo Separator ---
+  FCmbSeparator              := TComboBox.Create(Self);
+  FCmbSeparator.Parent       := Self;
+  FCmbSeparator.Style        := csDropDownList;
+  FCmbSeparator.OnChange     := OnSeparatorChange;
+
+  // --- Label Format ---
+  FLblFormat         := TLabel.Create(Self);
+  FLblFormat.Parent  := Self;
+  FLblFormat.Caption := 'Format data';
+  FLblFormat.AutoSize:= False;
+
+  // --- Combo Format ---
+  FCmbFormat              := TComboBox.Create(Self);
+  FCmbFormat.Parent       := Self;
+  FCmbFormat.Style        := csDropDownList;
+  FCmbFormat.OnChange     := OnFormatChange;
+
+  PopulateSeparatorCombo;
+  // Selectam implicit tsDash
+  FCmbSeparator.ItemIndex := Ord(tsDash);
+  PopulateFormatCombo;
+
+  RebuildLayout;
+end;
+
+// ---------------------------------------------------------------------------
+// Populare combouri
+// ---------------------------------------------------------------------------
+
+procedure TTeliteDateFormatSelector.PopulateSeparatorCombo;
+var
+  LSep: TTELITE_SEPARATOR;
+begin
+  FCmbSeparator.Items.BeginUpdate;
+  try
+    FCmbSeparator.Items.Clear;
+    for LSep := Low(TTELITE_SEPARATOR) to High(TTELITE_SEPARATOR) do
+      FCmbSeparator.Items.Add(SEPARATOR_LABELS[LSep]);
+  finally
+    FCmbSeparator.Items.EndUpdate;
+  end;
+end;
+
+procedure TTeliteDateFormatSelector.PopulateFormatCombo;
+var
+  LFmt      : TTELITE_DATE_FORMAT;
+  LSepChar  : string;
+  LMask     : string;
+  LPrevSel  : TTELITE_DATE_FORMAT;
+begin
+  LPrevSel := GetDateFormat;
+  LSepChar := GetSeparatorChar;
+
+  FCmbFormat.Items.BeginUpdate;
+  try
+    FCmbFormat.Items.Clear;
+    for LFmt := Succ(Low(TTELITE_DATE_FORMAT)) to High(TTELITE_DATE_FORMAT) do
+    begin
+      // Ia masca neutra (cu spatii) si inlocuieste cu separatorul ales
+      LMask := StringReplace(
+                 TeliteDateFormatToString(LFmt),
+                 ' ', LSepChar,
+                 [rfReplaceAll]
+               );
+      FCmbFormat.Items.AddObject(LMask, TObject(LFmt));
+    end;
+  finally
+    FCmbFormat.Items.EndUpdate;
+  end;
+
+  // Reselect acelasi format daca exista in continuare
+  SetDateFormat(LPrevSel);
+end;
+
+// ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+procedure TTeliteDateFormatSelector.RebuildLayout;
+var
+  LW   : Integer;
+  LTop : Integer;
+begin
+  LW   := ClientWidth - 2 * CTRL_MARGIN;
+  LTop := CTRL_MARGIN;
+
+  FLblSeparator.SetBounds(CTRL_MARGIN, LTop, LW, LABEL_HEIGHT);
+  Inc(LTop, LABEL_HEIGHT + CTRL_SPACING);
+  FCmbSeparator.SetBounds(CTRL_MARGIN, LTop, LW, COMBO_HEIGHT);
+  Inc(LTop, COMBO_HEIGHT + CTRL_SPACING * 2);
+
+  FLblFormat.SetBounds(CTRL_MARGIN, LTop, LW, LABEL_HEIGHT);
+  Inc(LTop, LABEL_HEIGHT + CTRL_SPACING);
+  FCmbFormat.SetBounds(CTRL_MARGIN, LTop, LW, COMBO_HEIGHT);
+end;
+
+procedure TTeliteDateFormatSelector.Resize;
+begin
+  inherited;
+  RebuildLayout;
+end;
+
+procedure TTeliteDateFormatSelector.Loaded;
+begin
+  inherited;
+  RebuildLayout;
+end;
+
+// ---------------------------------------------------------------------------
+// Handlere evenimente interne
+// ---------------------------------------------------------------------------
+
+procedure TTeliteDateFormatSelector.OnSeparatorChange(Sender: TObject);
+begin
+  PopulateFormatCombo;
+  if Assigned(FOnFormatChanged) then
+    FOnFormatChanged(Self);
+end;
+
+procedure TTeliteDateFormatSelector.OnFormatChange(Sender: TObject);
+begin
+  if Assigned(FOnFormatChanged) then
+    FOnFormatChanged(Self);
+end;
+
+// ---------------------------------------------------------------------------
+// Getters / Setters
+// ---------------------------------------------------------------------------
+
+function TTeliteDateFormatSelector.GetSeparatorChar: string;
+begin
+  Result := SEPARATOR_CHARS[GetSeparator];
+end;
+
+function TTeliteDateFormatSelector.GetSeparator: TTELITE_SEPARATOR;
+var
+  LIdx: Integer;
+begin
+  LIdx := FCmbSeparator.ItemIndex;
+  if (LIdx >= Ord(Low(TTELITE_SEPARATOR))) and
+     (LIdx <= Ord(High(TTELITE_SEPARATOR))) then
+    Result := TTELITE_SEPARATOR(LIdx)
+  else
+    Result := tsDash;
+end;
+
+procedure TTeliteDateFormatSelector.SetSeparator(const AValue: TTELITE_SEPARATOR);
+begin
+  if FCmbSeparator.ItemIndex <> Ord(AValue) then
+  begin
+    FCmbSeparator.ItemIndex := Ord(AValue);
+    PopulateFormatCombo;
+  end;
+end;
+
+function TTeliteDateFormatSelector.GetDateFormat: TTELITE_DATE_FORMAT;
+var
+  LIdx: Integer;
+begin
+  LIdx := FCmbFormat.ItemIndex;
+  if LIdx >= 0 then
+    Result := TTELITE_DATE_FORMAT(FCmbFormat.Items.Objects[LIdx])
+  else
+    Result := edfNone;
+end;
+
+procedure TTeliteDateFormatSelector.SetDateFormat(const AValue: TTELITE_DATE_FORMAT);
+var
+  I: Integer;
+begin
+  if AValue = edfNone then
+  begin
+    FCmbFormat.ItemIndex := -1;
+    Exit;
+  end;
+  for I := 0 to FCmbFormat.Items.Count - 1 do
+  begin
+    if TTELITE_DATE_FORMAT(FCmbFormat.Items.Objects[I]) = AValue then
+    begin
+      FCmbFormat.ItemIndex := I;
+      Exit;
+    end;
+  end;
+  FCmbFormat.ItemIndex := -1;
+end;
+
+function TTeliteDateFormatSelector.GetLabelSeparatorText: string;
+begin
+  Result := FLblSeparator.Caption;
+end;
+
+procedure TTeliteDateFormatSelector.SetLabelSeparatorText(const AValue: string);
+begin
+  FLblSeparator.Caption := AValue;
+end;
+
+function TTeliteDateFormatSelector.GetLabelFormatText: string;
+begin
+  Result := FLblFormat.Caption;
+end;
+
+procedure TTeliteDateFormatSelector.SetLabelFormatText(const AValue: string);
+begin
+  FLblFormat.Caption := AValue;
+end;
+
+// ---------------------------------------------------------------------------
+// FormattedMask
+// ---------------------------------------------------------------------------
+
+function TTeliteDateFormatSelector.FormattedMask: string;
+var
+  LFmt     : TTELITE_DATE_FORMAT;
+  LSepChar : string;
+begin
+  LFmt     := GetDateFormat;
+  LSepChar := GetSeparatorChar;
+  if LFmt = edfNone then
+    Exit('');
+  Result := StringReplace(
+              TeliteDateFormatToString(LFmt),
+              ' ', LSepChar,
+              [rfReplaceAll]
+            );
+end;
+
+// ---------------------------------------------------------------------------
+// Inregistrare componenta
+// ---------------------------------------------------------------------------
+
+procedure Register;
+begin
+  RegisterComponents('Telite', [TTeliteDateFormatSelector]);
+end;
+
+end.
