@@ -3,26 +3,18 @@ unit uTeliteDateFormatSelector;
 {
   TTeliteDateFormatSelector
   --------------------------
-  Componenta VCL extinsa din TPanel care permite selectia unui format de data.
+  Componenta VCL extinsa din TPanel.
 
-  Contine:
-    - Un TLabel + TComboBox pentru selectia separatorului (-, /, ., spatiu, fara)
-    - Un TLabel + TComboBox pentru selectia ordinii componentelor datei
-      (alimentat automat la schimbarea separatorului)
+  Layout:
+    [ Label (caption configurabil)           ]
+    [ CmbSeparator (w=40) ] [ CmbFormat (w=110) ]
 
-  Properties expuse in Object Inspector:
-    - Align, Anchors, Color, Font, Enabled, Visible  (mostenite, re-publicate)
-    - DateFormat      : TTELITE_DATE_FORMAT   (r/w)
-    - Separator       : TTELITE_SEPARATOR     (r/w)
-    - LabelSeparator  : string               (textul label-ului Separator)
-    - LabelFormat     : string               (textul label-ului Format)
-    - OnFormatChanged : TNotifyEvent
-
-  FIX design-time crash:
-    BeginUpdate/EndUpdate pe TComboBox.Items forteza crearea handle-ului
-    Windows inainte ca parent-ul sa existe -> InvalidControlOperation.
-    Solutie: popularea combo-urilor se face DOAR in Loaded (sau mai tarziu),
-    niciodata in constructor. In constructor setam doar campuri private.
+  - Labelul este deasupra celor 2 combo-uri
+  - Combo-urile sunt aliniate la aceeasi inaltime
+  - Distanta intre combo-uri: 5px
+  - Inaltimea combo-urilor este dictata de Font
+  - Width-urile implicite: separator=40, format=110
+  - Popularea se face in Loaded (fix design-time crash)
 }
 
 interface
@@ -47,26 +39,31 @@ type
 
   TTeliteDateFormatSelector = class(TPanel)
   private
-    FLblSeparator    : TLabel;
+    FLabel           : TLabel;
     FCmbSeparator    : TComboBox;
-    FLblFormat       : TLabel;
     FCmbFormat       : TComboBox;
     FOnFormatChanged : TNotifyEvent;
 
-    // Valorile "dorite" inainte ca handle-urile sa existe
     FPendingSeparator  : TTELITE_SEPARATOR;
     FPendingDateFormat : TTELITE_DATE_FORMAT;
     FPopulated         : Boolean;
+
+    FCmbSeparatorWidth : Integer;
+    FCmbFormatWidth    : Integer;
+    FCmbSpacing        : Integer;
+    FMargin            : Integer;
 
     function  GetSeparatorChar: string;
     function  GetSeparator: TTELITE_SEPARATOR;
     procedure SetSeparator(const AValue: TTELITE_SEPARATOR);
     function  GetDateFormat: TTELITE_DATE_FORMAT;
     procedure SetDateFormat(const AValue: TTELITE_DATE_FORMAT);
-    function  GetLabelSeparatorText: string;
-    procedure SetLabelSeparatorText(const AValue: string);
-    function  GetLabelFormatText: string;
-    procedure SetLabelFormatText(const AValue: string);
+    function  GetLabelText: string;
+    procedure SetLabelText(const AValue: string);
+    function  GetCmbSeparatorWidth: Integer;
+    procedure SetCmbSeparatorWidth(const AValue: Integer);
+    function  GetCmbFormatWidth: Integer;
+    procedure SetCmbFormatWidth(const AValue: Integer);
 
     procedure PopulateSeparatorCombo;
     procedure PopulateFormatCombo;
@@ -78,6 +75,7 @@ type
   protected
     procedure Loaded; override;
     procedure Resize; override;
+    procedure FontChanged(Sender: TObject); override;
 
   public
     constructor Create(AOwner: TComponent); override;
@@ -91,11 +89,12 @@ type
     property SeparatorChar: string read GetSeparatorChar;
 
   published
-    property Separator      : TTELITE_SEPARATOR   read GetSeparator   write SetSeparator   default tsDash;
-    property DateFormat     : TTELITE_DATE_FORMAT read GetDateFormat  write SetDateFormat  default edfYYYY_MM_DD;
-    property LabelSeparator : string              read GetLabelSeparatorText write SetLabelSeparatorText;
-    property LabelFormat    : string              read GetLabelFormatText    write SetLabelFormatText;
-    property OnFormatChanged: TNotifyEvent        read FOnFormatChanged      write FOnFormatChanged;
+    property Separator         : TTELITE_SEPARATOR   read GetSeparator          write SetSeparator          default tsDash;
+    property DateFormat        : TTELITE_DATE_FORMAT read GetDateFormat         write SetDateFormat         default edfYYYY_MM_DD;
+    property LabelCaption      : string              read GetLabelText          write SetLabelText;
+    property SeparatorComboWidth : Integer           read GetCmbSeparatorWidth  write SetCmbSeparatorWidth  default 40;
+    property FormatComboWidth    : Integer           read GetCmbFormatWidth     write SetCmbFormatWidth     default 110;
+    property OnFormatChanged   : TNotifyEvent        read FOnFormatChanged      write FOnFormatChanged;
 
     // Mostenite
     property Align;
@@ -133,17 +132,16 @@ const
   );
 
   SEPARATOR_LABELS: array[TTELITE_SEPARATOR] of string = (
-    'Fara separator',
-    'Linie  ( - )',
-    'Slash  ( / )',
-    'Punct  ( . )',
-    'Spatiu (   )'
+    '(none)',
+    ' - ',
+    ' / ',
+    ' . ',
+    '( )'
   );
 
-  CTRL_MARGIN  = 6;
-  CTRL_SPACING = 4;
-  LABEL_HEIGHT = 16;
-  COMBO_HEIGHT = 22;
+  DEFAULT_MARGIN       = 4;
+  DEFAULT_CMB_SPACING  = 5;
+  DEFAULT_LABEL_MARGIN = 2;  // spatiu intre label si combouri
 
 // ---------------------------------------------------------------------------
 
@@ -151,50 +149,44 @@ constructor TTeliteDateFormatSelector.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
 
-  // Setam aspect panel - fara sa atingem Items ale vreunui combo
-  Width       := 260;
-  Height      := 2 * CTRL_MARGIN + 2 * (LABEL_HEIGHT + CTRL_SPACING + COMBO_HEIGHT) + CTRL_SPACING * 2;
   Caption     := '';
   BevelOuter  := bvNone;
   ParentColor := False;
   Color       := clBtnFace;
 
-  // Valorile implicite retinute in campuri private
   FPendingSeparator  := tsDash;
   FPendingDateFormat := edfYYYY_MM_DD;
   FPopulated         := False;
+  FCmbSeparatorWidth := 40;
+  FCmbFormatWidth    := 110;
+  FCmbSpacing        := DEFAULT_CMB_SPACING;
+  FMargin            := DEFAULT_MARGIN;
 
-  // --- Label Separator ---
-  FLblSeparator          := TLabel.Create(Self);
-  FLblSeparator.Parent   := Self;
-  FLblSeparator.Caption  := 'Separator';
-  FLblSeparator.AutoSize := False;
+  // Label
+  FLabel          := TLabel.Create(Self);
+  FLabel.Parent   := Self;
+  FLabel.AutoSize := False;
+  FLabel.Caption  := 'Separator si format data';
 
-  // --- Combo Separator ---
-  // NU apelam Items.Add / BeginUpdate aici - doar cream controlul
+  // Combo Separator
   FCmbSeparator          := TComboBox.Create(Self);
   FCmbSeparator.Parent   := Self;
   FCmbSeparator.Style    := csDropDownList;
   FCmbSeparator.OnChange := CmbSeparatorChange;
 
-  // --- Label Format ---
-  FLblFormat          := TLabel.Create(Self);
-  FLblFormat.Parent   := Self;
-  FLblFormat.Caption  := 'Format data';
-  FLblFormat.AutoSize := False;
-
-  // --- Combo Format ---
+  // Combo Format
   FCmbFormat          := TComboBox.Create(Self);
   FCmbFormat.Parent   := Self;
   FCmbFormat.Style    := csDropDownList;
   FCmbFormat.OnChange := CmbFormatChange;
 
-  RebuildLayout;
-  // Popularea se face in Loaded, cand handle-urile exista garantat
+  // Dimensiune implicita panel: suficienta cat sa incapa label + combo
+  Width  := FMargin + FCmbSeparatorWidth + FCmbSpacing + FCmbFormatWidth + FMargin;
+  Height := FMargin + 16 + DEFAULT_LABEL_MARGIN + 22 + FMargin;
 end;
 
 // ---------------------------------------------------------------------------
-// Loaded - primul moment sigur pentru a popula combo-urile
+// Loaded
 // ---------------------------------------------------------------------------
 
 procedure TTeliteDateFormatSelector.Loaded;
@@ -212,7 +204,7 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
-// Populare combouri - apelate DOAR dupa ce handle-urile exista
+// Populare
 // ---------------------------------------------------------------------------
 
 procedure TTeliteDateFormatSelector.PopulateSeparatorCombo;
@@ -249,30 +241,50 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
-// Layout
+// Layout - calculat pe baza fontului si a width-urilor configurate
 // ---------------------------------------------------------------------------
 
 procedure TTeliteDateFormatSelector.RebuildLayout;
 var
-  LW, LTop: Integer;
+  LCmbHeight : Integer;
+  LLblHeight : Integer;
+  LCmbTop    : Integer;
+  LLblTop    : Integer;
+  LTotalW    : Integer;
 begin
-  LW   := ClientWidth - 2 * CTRL_MARGIN;
-  LTop := CTRL_MARGIN;
+  // Inaltimea combo-ului este determinata de font (combo calculeaza singur
+  // in csDropDownList, dar putem lua ItemHeight ca referinta)
+  LCmbHeight := FCmbSeparator.Height;  // VCL ajusteaza automat dupa font
+  LLblHeight := FLabel.Canvas.TextHeight('Wg') + 2;
 
-  FLblSeparator.SetBounds(CTRL_MARGIN, LTop, LW, LABEL_HEIGHT);
-  Inc(LTop, LABEL_HEIGHT + CTRL_SPACING);
-  FCmbSeparator.SetBounds(CTRL_MARGIN, LTop, LW, COMBO_HEIGHT);
-  Inc(LTop, COMBO_HEIGHT + CTRL_SPACING * 2);
+  LLblTop := FMargin;
+  LCmbTop := LLblTop + LLblHeight + DEFAULT_LABEL_MARGIN;
 
-  FLblFormat.SetBounds(CTRL_MARGIN, LTop, LW, LABEL_HEIGHT);
-  Inc(LTop, LABEL_HEIGHT + CTRL_SPACING);
-  FCmbFormat.SetBounds(CTRL_MARGIN, LTop, LW, COMBO_HEIGHT);
+  LTotalW := FMargin + FCmbSeparatorWidth + FCmbSpacing + FCmbFormatWidth + FMargin;
+
+  // Label - se intinde pe toata latimea
+  FLabel.SetBounds(FMargin, LLblTop, LTotalW - 2 * FMargin, LLblHeight);
+
+  // Combo Separator
+  FCmbSeparator.SetBounds(FMargin, LCmbTop, FCmbSeparatorWidth, LCmbHeight);
+
+  // Combo Format - imediat dupa separator + spacing, la aceeasi inaltime
+  FCmbFormat.SetBounds(FMargin + FCmbSeparatorWidth + FCmbSpacing, LCmbTop,
+                       FCmbFormatWidth, LCmbHeight);
 end;
 
 procedure TTeliteDateFormatSelector.Resize;
 begin
   inherited;
-  RebuildLayout;
+  if FPopulated then
+    RebuildLayout;
+end;
+
+procedure TTeliteDateFormatSelector.FontChanged(Sender: TObject);
+begin
+  inherited;
+  if FPopulated then
+    RebuildLayout;
 end;
 
 // ---------------------------------------------------------------------------
@@ -310,7 +322,6 @@ var
 begin
   if not FPopulated then
     Exit(FPendingSeparator);
-
   LIdx := FCmbSeparator.ItemIndex;
   if (LIdx >= Ord(Low(TTELITE_SEPARATOR))) and
      (LIdx <= Ord(High(TTELITE_SEPARATOR))) then
@@ -323,7 +334,6 @@ procedure TTeliteDateFormatSelector.SetSeparator(const AValue: TTELITE_SEPARATOR
 begin
   FPendingSeparator := AValue;
   if not FPopulated then Exit;
-
   if FCmbSeparator.ItemIndex <> Ord(AValue) then
   begin
     FCmbSeparator.ItemIndex := Ord(AValue);
@@ -337,7 +347,6 @@ var
 begin
   if not FPopulated then
     Exit(FPendingDateFormat);
-
   LIdx := FCmbFormat.ItemIndex;
   if LIdx >= 0 then
     Result := TTELITE_DATE_FORMAT(FCmbFormat.Items.Objects[LIdx])
@@ -351,7 +360,6 @@ var
 begin
   FPendingDateFormat := AValue;
   if not FPopulated then Exit;
-
   if AValue = edfNone then
   begin
     FCmbFormat.ItemIndex := -1;
@@ -366,24 +374,42 @@ begin
   FCmbFormat.ItemIndex := -1;
 end;
 
-function TTeliteDateFormatSelector.GetLabelSeparatorText: string;
+function TTeliteDateFormatSelector.GetLabelText: string;
 begin
-  Result := FLblSeparator.Caption;
+  Result := FLabel.Caption;
 end;
 
-procedure TTeliteDateFormatSelector.SetLabelSeparatorText(const AValue: string);
+procedure TTeliteDateFormatSelector.SetLabelText(const AValue: string);
 begin
-  FLblSeparator.Caption := AValue;
+  FLabel.Caption := AValue;
 end;
 
-function TTeliteDateFormatSelector.GetLabelFormatText: string;
+function TTeliteDateFormatSelector.GetCmbSeparatorWidth: Integer;
 begin
-  Result := FLblFormat.Caption;
+  Result := FCmbSeparatorWidth;
 end;
 
-procedure TTeliteDateFormatSelector.SetLabelFormatText(const AValue: string);
+procedure TTeliteDateFormatSelector.SetCmbSeparatorWidth(const AValue: Integer);
 begin
-  FLblFormat.Caption := AValue;
+  if FCmbSeparatorWidth <> AValue then
+  begin
+    FCmbSeparatorWidth := AValue;
+    if FPopulated then RebuildLayout;
+  end;
+end;
+
+function TTeliteDateFormatSelector.GetCmbFormatWidth: Integer;
+begin
+  Result := FCmbFormatWidth;
+end;
+
+procedure TTeliteDateFormatSelector.SetCmbFormatWidth(const AValue: Integer);
+begin
+  if FCmbFormatWidth <> AValue then
+  begin
+    FCmbFormatWidth := AValue;
+    if FPopulated then RebuildLayout;
+  end;
 end;
 
 // ---------------------------------------------------------------------------
